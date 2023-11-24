@@ -65,7 +65,7 @@ contract BetManager {
         uint256 pubId,
         uint256 profileId,
         uint256 stakerId
-    ) external payable {
+    ) external payable returns (bool) {
         Bet storage bet = bets[profileId][pubId];
         require(
             bet.creatorId == stakerId || bet.userId == stakerId,
@@ -98,5 +98,7 @@ contract BetManager {
         if (bet.creatorStaked && bet.userStaked) {
             bet.active = true;
         }
+
+        return true;
     }
 }
