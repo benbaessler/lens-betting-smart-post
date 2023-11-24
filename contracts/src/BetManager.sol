@@ -27,6 +27,8 @@ contract BetManager {
         ILensHub(0xC1E77eE73403B8a7478884915aA599932A677870);
 
     mapping(uint256 profileId => mapping(uint256 pubId => Bet)) private bets;
+    mapping(uint256 profileId => mapping(uint256 pubId => mapping(uint256 jurorId => bool)))
+        private jujorDecided;
 
     function createBet(
         uint256 pubId,
@@ -58,18 +60,17 @@ contract BetManager {
     }
 
     /// @notice participants stake tokens to activate the bet
-    /// @param staker: 0 for creator, 1 for challenged user
+    /// @param stakerId: profile id of the staker
     function stake(
         uint256 pubId,
         uint256 profileId,
-        uint256 staker
+        uint256 stakerId
     ) external payable {
-        require(
-            staker < 3,
-            "Invalid staker value: must be 0 for creator or 1 for challenged user"
-        );
-
         Bet storage bet = bets[profileId][pubId];
+        require(
+            bet.creatorId == stakerId || bet.userId == stakerId,
+            "You are not allowed to stake for this bet"
+        );
         require(!bet.active, "Bet is already active");
         require(!bet.decided, "Bet is already completed");
         require(
@@ -78,17 +79,19 @@ contract BetManager {
         );
         require(msg.value == bet.amount, "Incorrect amount");
 
-        if (staker == 0) {
+        if (bet.creatorId == stakerId) {
             require(
                 lensHub.ownerOf(bet.creatorId) == msg.sender,
                 "You are not allowed to stake for the creator"
             );
+            require(!bet.creatorStaked, "Creator already staked");
             bet.creatorStaked = true;
-        } else if (staker == 1) {
+        } else if (bet.userId == stakerId) {
             require(
                 lensHub.ownerOf(bet.userId) == msg.sender,
                 "You are not allowed to stake for the challenged user"
             );
+            require(!bet.userStaked, "User already staked");
             bet.userStaked = true;
         }
 
