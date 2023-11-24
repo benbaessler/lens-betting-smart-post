@@ -23,10 +23,13 @@ contract BetManager is IBetManager {
         uint256 outcome;
     }
 
-    ILensHub public lensHub =
-        ILensHub(0xC1E77eE73403B8a7478884915aA599932A677870);
+    ILensHub public lensHub;
 
     mapping(uint256 profileId => mapping(uint256 pubId => Bet)) public bets;
+
+    constructor(address lensHubProxyContract) {
+        lensHub = ILensHub(lensHubProxyContract);
+    }
 
     event BetCreated(
         uint256 indexed pubId,

@@ -13,8 +13,8 @@ contract BetManagerScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        IBetManager betManager = new BetManager();
-        address lensHubProxyAddress = 0xC1E77eE73403B8a7478884915aA599932A677870;
+        address lensHubProxyAddress = 0x4fbffF20302F3326B20052ab9C217C44F6480900;
+        IBetManager betManager = new BetManager(lensHubProxyAddress);
 
         new BetOpenAction(lensHubProxyAddress, address(betManager));
 
