@@ -9,36 +9,32 @@ contract BetManager {
     /// @param userId: profile id of the challenged user
     /// @param amount: of required tokens to stake
     /// @param deadline: as unix timestamp
-    /// @param jurors: array of jurors' profile ids
+    /// @param juror: juror profile ids
     struct Bet {
         uint256 creatorId;
         uint256 userId;
+        uint256 jurorId;
         uint256 amount;
         uint256 deadline;
-        uint256[] jurors;
         bool creatorStaked;
         bool userStaked;
         bool active;
-        bool decided;
-        bool outcome;
+        uint256 outcome;
     }
 
     ILensHub public lensHub =
         ILensHub(0xC1E77eE73403B8a7478884915aA599932A677870);
 
     mapping(uint256 profileId => mapping(uint256 pubId => Bet)) private bets;
-    mapping(uint256 profileId => mapping(uint256 pubId => mapping(uint256 jurorId => bool)))
-        private jujorDecided;
 
     function createBet(
         uint256 pubId,
         uint256 creatorId,
         uint256 userId,
+        uint256 jurorId,
         uint256 amount,
-        uint256 deadline,
-        uint256[] memory jurors
+        uint256 deadline
     ) external {
-        require(jurors.length > 0, "There must be at least 1 juror");
         require(amount > 0, "Amount can not be zero");
         require(
             deadline > block.timestamp,
@@ -48,14 +44,13 @@ contract BetManager {
         bets[creatorId][pubId] = Bet(
             creatorId,
             userId,
+            jurorId,
             amount,
             deadline,
-            jurors,
             false,
             false,
             false,
-            false,
-            false
+            0
         );
     }
 
@@ -72,7 +67,7 @@ contract BetManager {
             "You are not allowed to stake for this bet"
         );
         require(!bet.active, "Bet is already active");
-        require(!bet.decided, "Bet is already completed");
+        require(bet.outcome == 0, "Bet is already completed");
         require(
             bet.deadline > block.timestamp,
             "The deadline has already passed"
@@ -100,5 +95,35 @@ contract BetManager {
         }
 
         return true;
+    }
+
+    /// @notice juror decides the outcome of the bet
+    /// @dev only callable by the bet juror
+    /// @param outcome: 1 for creator, 2 for user
+    function finalize(
+        uint256 pubId,
+        uint256 profileId,
+        uint256 outcome
+    ) external {
+        Bet storage bet = bets[profileId][pubId];
+        require(bet.active, "Bet is not active");
+        require(bet.outcome == 0, "Bet is already completed");
+        require(
+            bet.deadline < block.timestamp,
+            "The deadline has not yet passed"
+        );
+        require(
+            lensHub.ownerOf(bet.jurorId) == msg.sender,
+            "You are not allowed to decide for this bet"
+        );
+        require(outcome == 1 || outcome == 2, "Invalid outcome");
+
+        bet.outcome = outcome;
+
+        if (outcome == 1) {
+            payable(lensHub.ownerOf(bet.creatorId)).transfer(bet.amount * 2);
+        } else if (outcome == 2) {
+            payable(lensHub.ownerOf(bet.userId)).transfer(bet.amount * 2);
+        }
     }
 }
