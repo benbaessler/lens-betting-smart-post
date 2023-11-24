@@ -28,6 +28,37 @@ contract BetManager is IBetManager {
 
     mapping(uint256 profileId => mapping(uint256 pubId => Bet)) public bets;
 
+    event BetCreated(
+        uint256 indexed pubId,
+        uint256 indexed creatorId,
+        uint256 indexed userId,
+        uint256 jurorId,
+        uint256 amount,
+        uint256 deadline
+    );
+
+    event CreatorStaked(uint256 indexed pubId, uint256 indexed profileId);
+
+    event UserStaked(
+        uint256 indexed pubId,
+        uint256 indexed profileId,
+        uint256 indexed stakerId
+    );
+
+    event Unstaked(
+        uint256 indexed pubId,
+        uint256 indexed profileId,
+        uint256 indexed callerId
+    );
+
+    event BetActivated(uint256 indexed pubId, uint256 indexed profileId);
+
+    event BetFinalized(
+        uint256 indexed pubId,
+        uint256 indexed profileId,
+        uint256 outcome
+    );
+
     function createBet(
         uint256 pubId,
         uint256 creatorId,
@@ -53,6 +84,8 @@ contract BetManager is IBetManager {
             false,
             0
         );
+
+        emit BetCreated(pubId, creatorId, userId, jurorId, amount, deadline);
     }
 
     /// @notice participants stake tokens to activate the bet
@@ -82,6 +115,8 @@ contract BetManager is IBetManager {
             );
             require(!bet.creatorStaked, "Creator already staked");
             bet.creatorStaked = true;
+
+            emit CreatorStaked(pubId, profileId);
         } else if (bet.userId == stakerId) {
             require(
                 lensHub.ownerOf(bet.userId) == msg.sender,
@@ -89,38 +124,41 @@ contract BetManager is IBetManager {
             );
             require(!bet.userStaked, "User already staked");
             bet.userStaked = true;
+
+            emit UserStaked(pubId, profileId, stakerId);
         }
 
         if (bet.creatorStaked && bet.userStaked) {
             bet.active = true;
+            emit BetActivated(pubId, profileId);
         }
 
         return true;
     }
 
     /// @notice participants withdraw their stake
-    /// @param stakerId: profile id of the staker
+    /// @param callerId: profile id of the staker
     function unstake(
         uint256 pubId,
         uint256 profileId,
-        uint256 stakerId
+        uint256 callerId
     ) external returns (bool) {
         Bet storage bet = bets[profileId][pubId];
         require(
-            bet.creatorId == stakerId || bet.userId == stakerId,
+            bet.creatorId == callerId || bet.userId == callerId,
             "You are not allowed to unstake for this bet"
         );
         require(!bet.active, "Bet is already active");
         require(bet.outcome == 0, "Bet is already completed");
 
-        if (bet.creatorId == stakerId) {
+        if (bet.creatorId == callerId) {
             require(
                 lensHub.ownerOf(bet.creatorId) == msg.sender,
                 "You are not allowed to unstake for the creator"
             );
             require(bet.creatorStaked, "Creator did not stake");
             bet.creatorStaked = false;
-        } else if (bet.userId == stakerId) {
+        } else if (bet.userId == callerId) {
             require(
                 lensHub.ownerOf(bet.userId) == msg.sender,
                 "You are not allowed to unstake for the challenged user"
@@ -130,6 +168,8 @@ contract BetManager is IBetManager {
         }
 
         payable(msg.sender).transfer(bet.amount);
+
+        emit Unstaked(pubId, profileId, callerId);
 
         return true;
     }
@@ -146,7 +186,7 @@ contract BetManager is IBetManager {
         require(bet.active, "Bet is not active");
         require(bet.outcome == 0, "Bet is already completed");
         require(
-            bet.deadline < block.timestamp,
+            bet.deadline <= block.timestamp,
             "The deadline has not yet passed"
         );
         require(
@@ -162,5 +202,7 @@ contract BetManager is IBetManager {
         } else if (outcome == 2) {
             payable(lensHub.ownerOf(bet.userId)).transfer(bet.amount * 2);
         }
+
+        emit BetFinalized(pubId, profileId, outcome);
     }
 }
