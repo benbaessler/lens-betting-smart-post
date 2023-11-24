@@ -9,21 +9,35 @@ import {
 import { lensHubAbi } from "../utils/lensHubAbi";
 import { useWalletClient } from "wagmi";
 import { publicClient } from "../main";
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export const Create = () => {
   const { address, profileId, refresh } = useLensHelloWorld();
   const { data: walletClient } = useWalletClient();
   const [createState, setCreateState] = useState<string | undefined>();
   const [txHash, setTxHash] = useState<string | undefined>();
+
   const [uri, setURI] = useState<string>("");
-  const [initializeText, setInitializeText] = useState<string>("");
+  const [challengedProfileId, setChallengedProfileId] = useState<string>("");
+  const [jurorProfileId, setJurorProfileId] = useState<string>("");
+  const [amount, setAmount] = useState<string>("");
+  const [deadline, setDeadline] = useState<string>("");
 
   const createPost = async () => {
     const encodedInitData = encodeAbiParameters(
-      [{ type: "string" }],
-      [initializeText]
+      [
+        { type: "uint256" },
+        { type: "uint256" },
+        { type: "uint256" },
+        { type: "uint256" },
+      ],
+      [
+        BigInt(challengedProfileId),
+        BigInt(jurorProfileId),
+        BigInt(amount),
+        BigInt(deadline),
+      ]
     );
 
     // Post parameters
@@ -69,58 +83,75 @@ export const Create = () => {
   return (
     <>
       <div className="pb-4">
-        {
-          address && profileId && (
+        {address && profileId && (
+          <div className="flex flex-1 flex-col">
             <div className="flex flex-1 flex-col">
-              <div className="flex flex-1 flex-col">
-                <p className="my-2">
-                  Content URI (link to content for the post)
-                </p>
-                <Input
-                  type="text"
-                  value={uri}
-                  placeholder="URI"
-                  onChange={(e) => setURI(e.target.value)}
-                />
-                <p className="my-2">
-                  Initialize message (will be emitted in HelloWorld event)
-                </p>
-                <Input
-                  placeholder="Message"
-                  type="text"
-                  value={initializeText}
-                  onChange={(e) => setInitializeText(e.target.value)}
-                />
-                <Button
-                  className="mt-3"
-                  onClick={createPost}
-                >
-                  Create
-                </Button>
-              </div>
-              {createState && <p className="create-state-text">{createState}</p>}
-              {txHash && (
-                <a
-                  href={`${blockExplorerLink}${txHash}`}
-                  className="block-explorer-link"
-                >
-                  Block Explorer Link
-                </a>
-              )}
-              <Button
-                variant={'outline'}
-                className="my-3"
-                onClick={() => {
-                  setTxHash(undefined);
-                  setInitializeText("");
-                  setURI("");
-                }}
-              >
-                Clear
+              <p className="my-2">Content URI (link to content for the post)</p>
+              <Input
+                type="text"
+                value={uri}
+                placeholder="URI"
+                onChange={(e) => setURI(e.target.value)}
+              />
+              <p className="my-2">Challenged profile ID</p>
+              <Input
+                placeholder="Profile ID"
+                type="number"
+                value={challengedProfileId}
+                onChange={(e) => setChallengedProfileId(e.target.value)}
+              />
+              <p className="my-2">
+                Juror profile ID (this user will decide the outcome of the bet)
+              </p>
+              <Input
+                placeholder="Profile ID"
+                type="number"
+                value={jurorProfileId}
+                onChange={(e) => setJurorProfileId(e.target.value)}
+              />
+              <p className="my-2">Bet amount (MATIC)</p>
+              <Input
+                placeholder="Amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              <p className="my-2">Deadline (Unix timestamp)</p>
+              <Input
+                placeholder="Timestamp"
+                type="number"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+              <Button className="mt-3" onClick={createPost}>
+                Create
               </Button>
             </div>
-          )
-        }
+            {createState && <p className="create-state-text">{createState}</p>}
+            {txHash && (
+              <a
+                href={`${blockExplorerLink}${txHash}`}
+                className="block-explorer-link"
+              >
+                Block Explorer Link
+              </a>
+            )}
+            <Button
+              variant={"outline"}
+              className="my-3"
+              onClick={() => {
+                setTxHash(undefined);
+                setChallengedProfileId("");
+                setJurorProfileId("");
+                setAmount("");
+                setDeadline("");
+                setURI("");
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
       </div>
     </>
   );
