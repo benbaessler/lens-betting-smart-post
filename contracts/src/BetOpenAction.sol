@@ -25,18 +25,18 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
     ) external override onlyHub returns (bytes memory) {
         (
             uint256 userId,
+            uint256 jurorId,
             uint256 amount,
-            uint256 deadline,
-            uint256[] memory jurors
-        ) = abi.decode(data, (uint256, uint256, uint256, uint256[]));
+            uint256 deadline
+        ) = abi.decode(data, (uint256, uint256, uint256, uint256));
 
         betManager.createBet(
             pubId,
             profileId,
             userId,
+            jurorId,
             amount,
-            deadline,
-            jurors
+            deadline
         );
 
         return data;
