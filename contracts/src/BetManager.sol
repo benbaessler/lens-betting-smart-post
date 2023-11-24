@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IBetManager} from "./interfaces/IBetManager.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {ILensHub} from "./interfaces/ILensHub.sol";
 
-contract BetManager {
+contract BetManager is IBetManager {
     /// @param creatorId: profile id of the bet creator
     /// @param userId: profile id of the challenged user
     /// @param amount: of required tokens to stake
@@ -25,7 +26,7 @@ contract BetManager {
     ILensHub public lensHub =
         ILensHub(0xC1E77eE73403B8a7478884915aA599932A677870);
 
-    mapping(uint256 profileId => mapping(uint256 pubId => Bet)) private bets;
+    mapping(uint256 profileId => mapping(uint256 pubId => Bet)) public bets;
 
     function createBet(
         uint256 pubId,
@@ -132,7 +133,6 @@ contract BetManager {
 
         return true;
     }
-
 
     /// @notice juror decides the outcome of the bet
     /// @dev only callable by the bet juror
