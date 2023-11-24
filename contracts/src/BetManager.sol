@@ -97,6 +97,43 @@ contract BetManager {
         return true;
     }
 
+    /// @notice participants withdraw their stake
+    /// @param stakerId: profile id of the staker
+    function unstake(
+        uint256 pubId,
+        uint256 profileId,
+        uint256 stakerId
+    ) external returns (bool) {
+        Bet storage bet = bets[profileId][pubId];
+        require(
+            bet.creatorId == stakerId || bet.userId == stakerId,
+            "You are not allowed to unstake for this bet"
+        );
+        require(!bet.active, "Bet is already active");
+        require(bet.outcome == 0, "Bet is already completed");
+
+        if (bet.creatorId == stakerId) {
+            require(
+                lensHub.ownerOf(bet.creatorId) == msg.sender,
+                "You are not allowed to unstake for the creator"
+            );
+            require(bet.creatorStaked, "Creator did not stake");
+            bet.creatorStaked = false;
+        } else if (bet.userId == stakerId) {
+            require(
+                lensHub.ownerOf(bet.userId) == msg.sender,
+                "You are not allowed to unstake for the challenged user"
+            );
+            require(bet.userStaked, "User did not stake");
+            bet.userStaked = false;
+        }
+
+        payable(msg.sender).transfer(bet.amount);
+
+        return true;
+    }
+
+
     /// @notice juror decides the outcome of the bet
     /// @dev only callable by the bet juror
     /// @param outcome: 1 for creator, 2 for user
