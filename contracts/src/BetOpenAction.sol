@@ -5,16 +5,16 @@ pragma solidity ^0.8.18;
 import {HubRestricted} from "lens/HubRestricted.sol";
 import {Types} from "lens/Types.sol";
 import {IPublicationActionModule} from "./interfaces/IPublicationActionModule.sol";
-import {BetManager} from "./BetManager.sol";
+import {IBetManager} from "./interfaces/IBetManager.sol";
 
 contract BetOpenAction is HubRestricted, IPublicationActionModule {
-    BetManager internal betManager;
+    IBetManager public betManager;
 
     constructor(
         address lensHubProxyContract,
         address betManagerContract
     ) HubRestricted(lensHubProxyContract) {
-        betManager = BetManager(betManagerContract);
+        betManager = IBetManager(betManagerContract);
     }
 
     function initializePublicationAction(
@@ -30,14 +30,14 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
             uint256 deadline
         ) = abi.decode(data, (uint256, uint256, uint256, uint256));
 
-        betManager.createBet(
-            pubId,
-            profileId,
-            userId,
-            jurorId,
-            amount,
-            deadline
-        );
+        betManager.createBet({
+            pubId: pubId,
+            creatorId: profileId,
+            userId: userId,
+            jurorId: jurorId,
+            amount: amount,
+            deadline: deadline
+        });
 
         return data;
     }
