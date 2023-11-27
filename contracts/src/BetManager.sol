@@ -4,8 +4,9 @@ pragma solidity ^0.8.0;
 import {IBetManager} from "./interfaces/IBetManager.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {ILensHub} from "./interfaces/ILensHub.sol";
+import {IModuleRegistry} from "./interfaces/IModuleRegistry.sol";
 
-contract BetManager is IBetManager {
+library Types {
     /// @param creatorId: profile id of the bet creator
     /// @param userId: profile id of the challenged user
     /// @param amount: of required tokens to stake
@@ -15,6 +16,7 @@ contract BetManager is IBetManager {
         uint256 creatorId;
         uint256 userId;
         uint256 jurorId;
+        address currency;
         uint256 amount;
         uint256 deadline;
         bool creatorStaked;
@@ -22,14 +24,13 @@ contract BetManager is IBetManager {
         bool active;
         uint256 outcome;
     }
+}
 
-    ILensHub public lensHub;
+contract BetManager {
+    mapping(uint256 profileId => mapping(uint256 pubId => Types.Bet)) public bets;
 
-    mapping(uint256 profileId => mapping(uint256 pubId => Bet)) public bets;
-
-    constructor(address lensHubProxyContract) {
-        lensHub = ILensHub(lensHubProxyContract);
-    }
+    ILensHub public immutable LENS_HUB;
+    IModuleRegistry public immutable MODULE_REGISTRY;
 
     event BetCreated(
         uint256 indexed pubId,
@@ -62,11 +63,19 @@ contract BetManager is IBetManager {
         uint256 outcome
     );
 
+    constructor(address lensHubProxyContract, address moduleRegistryContract) {
+        LENS_HUB = ILensHub(lensHubProxyContract);
+        MODULE_REGISTRY = IModuleRegistry(moduleRegistryContract);
+    }
+
+    // TODO: Remove require statements; if/revert with custom errors
+
     function createBet(
         uint256 pubId,
         uint256 creatorId,
         uint256 userId,
         uint256 jurorId,
+        address currency,
         uint256 amount,
         uint256 deadline
     ) external {
@@ -76,10 +85,11 @@ contract BetManager is IBetManager {
             "The deadline can not be in the past"
         );
 
-        bets[creatorId][pubId] = Bet(
+        bets[creatorId][pubId] = Types.Bet(
             creatorId,
             userId,
             jurorId,
+            currency,
             amount,
             deadline,
             false,
@@ -97,8 +107,8 @@ contract BetManager is IBetManager {
         uint256 pubId,
         uint256 profileId,
         uint256 stakerId
-    ) external payable returns (bool) {
-        Bet storage bet = bets[profileId][pubId];
+    ) external returns (bool) {
+        Types.Bet storage bet = bets[profileId][pubId];
         require(
             bet.creatorId == stakerId || bet.userId == stakerId,
             "You are not allowed to stake for this bet"
@@ -109,11 +119,11 @@ contract BetManager is IBetManager {
             bet.deadline > block.timestamp,
             "The deadline has already passed"
         );
-        require(msg.value == bet.amount, "Incorrect amount");
+        // require(msg.value == bet.amount, "Incorrect amount");
 
         if (bet.creatorId == stakerId) {
             require(
-                lensHub.ownerOf(bet.creatorId) == msg.sender,
+                LENS_HUB.ownerOf(bet.creatorId) == msg.sender,
                 "You are not allowed to stake for the creator"
             );
             require(!bet.creatorStaked, "Creator already staked");
@@ -122,7 +132,7 @@ contract BetManager is IBetManager {
             emit CreatorStaked(pubId, profileId);
         } else if (bet.userId == stakerId) {
             require(
-                lensHub.ownerOf(bet.userId) == msg.sender,
+                LENS_HUB.ownerOf(bet.userId) == msg.sender,
                 "You are not allowed to stake for the challenged user"
             );
             require(!bet.userStaked, "User already staked");
@@ -146,7 +156,7 @@ contract BetManager is IBetManager {
         uint256 profileId,
         uint256 callerId
     ) external returns (bool) {
-        Bet storage bet = bets[profileId][pubId];
+        Types.Bet storage bet = bets[profileId][pubId];
         require(
             bet.creatorId == callerId || bet.userId == callerId,
             "You are not allowed to unstake for this bet"
@@ -156,14 +166,14 @@ contract BetManager is IBetManager {
 
         if (bet.creatorId == callerId) {
             require(
-                lensHub.ownerOf(bet.creatorId) == msg.sender,
+                LENS_HUB.ownerOf(bet.creatorId) == msg.sender,
                 "You are not allowed to unstake for the creator"
             );
             require(bet.creatorStaked, "Creator did not stake");
             bet.creatorStaked = false;
         } else if (bet.userId == callerId) {
             require(
-                lensHub.ownerOf(bet.userId) == msg.sender,
+                LENS_HUB.ownerOf(bet.userId) == msg.sender,
                 "You are not allowed to unstake for the challenged user"
             );
             require(bet.userStaked, "User did not stake");
@@ -185,7 +195,7 @@ contract BetManager is IBetManager {
         uint256 profileId,
         uint256 outcome
     ) external {
-        Bet storage bet = bets[profileId][pubId];
+        Types.Bet storage bet = bets[profileId][pubId];
         require(bet.active, "Bet is not active");
         require(bet.outcome == 0, "Bet is already completed");
         require(
@@ -193,7 +203,7 @@ contract BetManager is IBetManager {
             "The deadline has not yet passed"
         );
         require(
-            lensHub.ownerOf(bet.jurorId) == msg.sender,
+            LENS_HUB.ownerOf(bet.jurorId) == msg.sender,
             "You are not allowed to decide for this bet"
         );
         require(outcome == 1 || outcome == 2, "Invalid outcome");
@@ -201,9 +211,9 @@ contract BetManager is IBetManager {
         bet.outcome = outcome;
 
         if (outcome == 1) {
-            payable(lensHub.ownerOf(bet.creatorId)).transfer(bet.amount * 2);
+            payable(LENS_HUB.ownerOf(bet.creatorId)).transfer(bet.amount * 2);
         } else if (outcome == 2) {
-            payable(lensHub.ownerOf(bet.userId)).transfer(bet.amount * 2);
+            payable(LENS_HUB.ownerOf(bet.userId)).transfer(bet.amount * 2);
         }
 
         emit BetFinalized(pubId, profileId, outcome);
