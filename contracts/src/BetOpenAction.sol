@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 
 import {HubRestricted} from "lens/HubRestricted.sol";
 import {Types} from "lens/Types.sol";
+import {LensModuleMetadata} from "lens/LensModuleMetadata.sol";
 import {IPublicationActionModule} from "./interfaces/IPublicationActionModule.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {ILensHub} from "./interfaces/ILensHub.sol";
@@ -12,9 +13,13 @@ import {IModuleRegistry} from "./interfaces/IModuleRegistry.sol";
 library BetTypes {
     /// @param creatorId: profile id of the bet creator
     /// @param userId: profile id of the challenged user
+    /// @param jurorId: profile id of the juror
+    /// @param currency: address of the token used for the bet
     /// @param amount: of required tokens to stake
     /// @param deadline: as unix timestamp
-    /// @param juror: juror profile ids
+    /// @param staked: whether the creator has staked
+    /// @param active: whether both parties have staked
+    /// @param outcome: 0 for undecided, 1 for creator, 2 for user
     struct Bet {
         uint256 creatorId;
         uint256 userId;
@@ -22,6 +27,7 @@ library BetTypes {
         address currency;
         uint256 amount;
         uint256 deadline;
+        bool staked;
         bool active;
         uint256 outcome;
     }
@@ -35,7 +41,11 @@ library BetTypes {
     }
 }
 
-contract BetOpenAction is HubRestricted, IPublicationActionModule {
+contract BetOpenAction is
+    HubRestricted,
+    IPublicationActionModule,
+    LensModuleMetadata
+{
     ILensHub public immutable LENS_HUB;
     IModuleRegistry public immutable MODULE_REGISTRY;
 
@@ -44,6 +54,15 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
 
     error CurrencyNotWhitelisted();
     error DeadlineInPast();
+    error InvalidJuror();
+    error BetNotStaked();
+    error BetAlreadyActive();
+    error BetAlreadyFinalized();
+    error BetExpired();
+    error InvalidCaller();
+    error BetNotActive();
+    error BetNotExpired();
+    error InvalidOutcome();
 
     event BetCreated(
         uint256 indexed pubId,
@@ -54,6 +73,8 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
         uint256 amount,
         uint256 deadline
     );
+
+    event BetStaked(uint256 indexed pubId, uint256 indexed profileId);
 
     // event Unstaked(
     //     uint256 indexed pubId,
@@ -75,16 +96,25 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
 
     constructor(
         address lensHubProxyContract,
-        address moduleRegistryContract
-    ) HubRestricted(lensHubProxyContract) {
+        address moduleRegistryContract,
+        address moduleOwner
+    ) HubRestricted(lensHubProxyContract) LensModuleMetadata(moduleOwner) {
         LENS_HUB = ILensHub(lensHubProxyContract);
         MODULE_REGISTRY = IModuleRegistry(moduleRegistryContract);
+    }
+
+    function supportsInterface(
+        bytes4 interfaceID
+    ) public pure override returns (bool) {
+        return
+            interfaceID == type(IPublicationActionModule).interfaceId ||
+            super.supportsInterface(interfaceID);
     }
 
     function initializePublicationAction(
         uint256 profileId,
         uint256 pubId,
-        address transactionExecutor,
+        address,
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         BetTypes.InitActionParams memory params = abi.decode(
@@ -100,11 +130,9 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
             revert DeadlineInPast();
         }
 
-        IERC20(params.currency).transferFrom(
-            transactionExecutor,
-            address(this),
-            params.amount
-        );
+        if (params.jurorId == params.userId || params.jurorId == profileId) {
+            revert InvalidJuror();
+        }
 
         bets[profileId][pubId] = BetTypes.Bet(
             profileId,
@@ -113,6 +141,7 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
             params.currency,
             params.amount,
             params.deadline,
+            false,
             false,
             0
         );
@@ -136,16 +165,12 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
         BetTypes.Bet storage bet = bets[params.publicationActedProfileId][
             params.publicationActedId
         ];
-        require(!bet.active, "Bet is already active");
-        require(bet.outcome == 0, "Bet is already completed");
-        require(
-            bet.deadline > block.timestamp,
-            "The deadline has already passed"
-        );
-        require(
-            bet.userId == params.actorProfileId,
-            "You are not allowed to stake for the challenged user"
-        );
+
+        if (!bet.staked) revert BetNotStaked();
+        if (bet.active) revert BetAlreadyActive();
+        if (bet.outcome != 0) revert BetAlreadyFinalized();
+        if (bet.deadline < block.timestamp) revert BetExpired();
+        if (bet.userId != params.actorProfileId) revert InvalidCaller();
 
         IERC20(bet.currency).transferFrom(
             params.transactionExecutor,
@@ -164,6 +189,26 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
         return abi.encode(true);
     }
 
+    /// @notice creator stakes the bet amount
+    /// @dev only callable by the bet creator
+    function stake(uint256 pubId, uint256 profileId) external returns (bool) {
+        BetTypes.Bet storage bet = bets[profileId][pubId];
+        if (LENS_HUB.ownerOf(profileId) != msg.sender) revert InvalidCaller();
+        if (bet.staked) revert BetAlreadyActive();
+
+        bet.staked = true;
+
+        IERC20(bet.currency).transferFrom(
+            msg.sender,
+            address(this),
+            bet.amount
+        );
+
+        emit BetStaked(pubId, profileId);
+
+        return true;
+    }
+
     /// @notice juror decides the outcome of the bet
     /// @dev only callable by the bet juror
     /// @param outcome: 1 for creator, 2 for user
@@ -173,17 +218,11 @@ contract BetOpenAction is HubRestricted, IPublicationActionModule {
         uint256 outcome
     ) external {
         BetTypes.Bet storage bet = bets[profileId][pubId];
-        require(bet.active, "Bet is not active");
-        require(bet.outcome == 0, "Bet is already completed");
-        require(
-            bet.deadline <= block.timestamp,
-            "The deadline has not yet passed"
-        );
-        require(
-            LENS_HUB.ownerOf(bet.jurorId) == msg.sender,
-            "You are not allowed to decide for this bet"
-        );
-        require(outcome == 1 || outcome == 2, "Invalid outcome");
+        if (!bet.active) revert BetNotActive();
+        if (bet.outcome != 0) revert BetAlreadyFinalized();
+        if (bet.deadline > block.timestamp) revert BetNotExpired();
+        if (LENS_HUB.ownerOf(profileId) != msg.sender) revert InvalidCaller();
+        if (outcome != 1 && outcome != 2) revert InvalidOutcome();
 
         bet.outcome = outcome;
 
