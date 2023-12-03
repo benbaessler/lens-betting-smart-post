@@ -41,7 +41,7 @@ interface IBetManager {
         uint256 pubId,
         uint256 profileId,
         uint256 stakerId
-    ) external payable returns (bool);
+    ) external returns (bool);
 
     function unstake(
         uint256 pubId,

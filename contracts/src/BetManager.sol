@@ -27,10 +27,13 @@ library Types {
 }
 
 contract BetManager {
-    mapping(uint256 profileId => mapping(uint256 pubId => Types.Bet)) public bets;
-
     ILensHub public immutable LENS_HUB;
     IModuleRegistry public immutable MODULE_REGISTRY;
+
+    mapping(uint256 profileId => mapping(uint256 pubId => Types.Bet))
+        public bets;
+
+    error CurrencyNotWhitelisted();
 
     event BetCreated(
         uint256 indexed pubId,
@@ -79,7 +82,10 @@ contract BetManager {
         uint256 amount,
         uint256 deadline
     ) external {
-        require(amount > 0, "Amount can not be zero");
+        if (!MODULE_REGISTRY.isErc20CurrencyRegistered(currency)) {
+            revert CurrencyNotWhitelisted();
+        }
+
         require(
             deadline > block.timestamp,
             "The deadline can not be in the past"
@@ -106,24 +112,20 @@ contract BetManager {
     function stake(
         uint256 pubId,
         uint256 profileId,
-        uint256 stakerId
+        uint256 stakerId,
+        address transactionExecutor
     ) external returns (bool) {
         Types.Bet storage bet = bets[profileId][pubId];
-        require(
-            bet.creatorId == stakerId || bet.userId == stakerId,
-            "You are not allowed to stake for this bet"
-        );
         require(!bet.active, "Bet is already active");
         require(bet.outcome == 0, "Bet is already completed");
         require(
             bet.deadline > block.timestamp,
             "The deadline has already passed"
         );
-        // require(msg.value == bet.amount, "Incorrect amount");
 
         if (bet.creatorId == stakerId) {
             require(
-                LENS_HUB.ownerOf(bet.creatorId) == msg.sender,
+                LENS_HUB.ownerOf(bet.creatorId) == transactionExecutor,
                 "You are not allowed to stake for the creator"
             );
             require(!bet.creatorStaked, "Creator already staked");
@@ -132,7 +134,7 @@ contract BetManager {
             emit CreatorStaked(pubId, profileId);
         } else if (bet.userId == stakerId) {
             require(
-                LENS_HUB.ownerOf(bet.userId) == msg.sender,
+                LENS_HUB.ownerOf(bet.userId) == transactionExecutor,
                 "You are not allowed to stake for the challenged user"
             );
             require(!bet.userStaked, "User already staked");
