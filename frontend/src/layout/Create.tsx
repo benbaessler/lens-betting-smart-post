@@ -1,11 +1,7 @@
 import { useState } from "react";
-import { useLensHelloWorld } from "../context/LensHellowWorldContext";
-import { encodeAbiParameters, encodeFunctionData } from "viem";
-import {
-  blockExplorerLink,
-  lensHubProxyAddress,
-  openActionContractAddress,
-} from "../utils/constants";
+import { useLensHelloWorld } from "../context/LensHelloWorldContext";
+import { encodeAbiParameters, encodeFunctionData, zeroAddress } from "viem";
+import { uiConfig } from "../utils/constants";
 import { lensHubAbi } from "../utils/lensHubAbi";
 import { useWalletClient } from "wagmi";
 import { publicClient } from "../main";
@@ -16,6 +12,7 @@ export const Create = () => {
   const { address, profileId, refresh } = useLensHelloWorld();
   const { data: walletClient } = useWalletClient();
   const [createState, setCreateState] = useState<string | undefined>();
+  const [freeCollect, setFreeCollect] = useState<boolean>(false);
   const [txHash, setTxHash] = useState<string | undefined>();
 
   const [uri, setURI] = useState<string>("");
@@ -24,7 +21,19 @@ export const Create = () => {
   const [amount, setAmount] = useState<string>("");
   const [deadline, setDeadline] = useState<string>("");
 
+  // const requestAllowance = async (address: string, amount: number) => {
+  //   const data = await publicClient.requestAllowance({
+  //     address,
+  //     amount,
+  //     tokenAddress: uiConfig.openActionContractAddress,
+  //     abi: ERC20ABI,
+  //   });
+  // };
+
   const createPost = async () => {
+    // request token allowance from user for BigInt(amount) of WMATIC
+    // this is needed because the open action contract will transfer the amount from the user
+
     const encodedInitData = encodeAbiParameters(
       [
         { type: "uint256" },
@@ -43,18 +52,45 @@ export const Create = () => {
       ]
     );
 
+    const actionModulesInitDatas = [encodedInitData];
+    const actionModules = [uiConfig.openActionContractAddress];
+    if (freeCollect) {
+      const baseFeeCollectModuleTypes = [
+        { type: "uint160" },
+        { type: "uint96" },
+        { type: "address" },
+        { type: "uint16" },
+        { type: "bool" },
+        { type: "uint72" },
+        { type: "address" },
+      ];
+
+      const encodedBaseFeeCollectModuleInitData = encodeAbiParameters(
+        baseFeeCollectModuleTypes,
+        [0, 0, zeroAddress, 0, false, 0, zeroAddress]
+      );
+
+      const encodedCollectActionInitData = encodeAbiParameters(
+        [{ type: "address" }, { type: "bytes" }],
+        [
+          uiConfig.simpleCollectModuleContractAddress,
+          encodedBaseFeeCollectModuleInitData,
+        ]
+      );
+      actionModulesInitDatas.push(encodedCollectActionInitData);
+      actionModules.push(uiConfig.collectActionContractAddress);
+    }
+
     // Post parameters
     const args = {
       profileId: BigInt(profileId!),
       contentURI: uri,
-      actionModules: [openActionContractAddress as `0x${string}`],
-      actionModulesInitDatas: [encodedInitData],
+      actionModules,
+      actionModulesInitDatas,
       referenceModule:
         "0x0000000000000000000000000000000000000000" as `0x${string}`,
       referenceModuleInitData: "0x01" as `0x${string}`,
     };
-
-    console.log(profileId);
 
     const calldata = encodeFunctionData({
       abi: lensHubAbi,
@@ -65,7 +101,7 @@ export const Create = () => {
     setCreateState("PENDING IN WALLET");
     try {
       const hash = await walletClient!.sendTransaction({
-        to: lensHubProxyAddress,
+        to: uiConfig.lensHubProxyAddress,
         account: address,
         data: calldata,
       });
@@ -128,6 +164,16 @@ export const Create = () => {
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
               />
+              <div className="my-3 mx-auto">
+                <input
+                  type="checkbox"
+                  id="filterCheckbox"
+                  className="mr-3 cursor-pointer"
+                  checked={freeCollect}
+                  onChange={(e) => setFreeCollect(e.target.checked)}
+                />
+                <label htmlFor="filterCheckbox">Enable free collects</label>
+              </div>
               <Button className="mt-3" onClick={createPost}>
                 Create
               </Button>
@@ -135,8 +181,9 @@ export const Create = () => {
             {createState && <p className="create-state-text">{createState}</p>}
             {txHash && (
               <a
-                href={`${blockExplorerLink}${txHash}`}
+                href={`${uiConfig.blockExplorerLink}${txHash}`}
                 className="block-explorer-link"
+                target="_blank"
               >
                 Block Explorer Link
               </a>
@@ -151,6 +198,7 @@ export const Create = () => {
                 setAmount("");
                 setDeadline("");
                 setURI("");
+                setCreateState(undefined);
               }}
             >
               Clear
