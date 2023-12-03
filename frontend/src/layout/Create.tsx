@@ -29,12 +29,15 @@ export const Create = () => {
       [
         { type: "uint256" },
         { type: "uint256" },
+        { type: "address" },
         { type: "uint256" },
         { type: "uint256" },
       ],
       [
         BigInt(challengedProfileId),
         BigInt(jurorProfileId),
+        // WMATIC on Mumbai
+        "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
         BigInt(amount),
         BigInt(deadline),
       ]
@@ -50,6 +53,8 @@ export const Create = () => {
         "0x0000000000000000000000000000000000000000" as `0x${string}`,
       referenceModuleInitData: "0x01" as `0x${string}`,
     };
+
+    console.log(profileId);
 
     const calldata = encodeFunctionData({
       abi: lensHubAbi,

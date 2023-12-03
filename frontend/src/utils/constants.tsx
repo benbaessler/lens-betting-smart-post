@@ -3,7 +3,7 @@ export const betManagerContractAddress =
 export const betManagerContractStartBlock = 42898785;
 
 export const openActionContractAddress =
-  "0x78240b65F1a4C946DBeA6064a6e8E0AA72d4629C";
+  "0x40b32ff05c111ab37941c322ac99fb90099f98bb";
 export const openActionsContractStartBlock = 42898785;
 
 // Delete later
