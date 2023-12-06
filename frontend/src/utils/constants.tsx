@@ -8,8 +8,6 @@ export const ipfsGateway = "https://ipfs.io/ipfs/";
 export const arweaveGateway = "https://arweave.net/";
 
 interface UiConfig {
-  helloWorldContractAddress: `0x${string}`;
-  helloWorldContractStartBlock: number;
   openActionContractAddress: `0x${string}`;
   openActionContractStartBlock: number;
   lensHubProxyAddress: `0x${string}`;
@@ -22,8 +20,6 @@ interface UiConfig {
 export const uiConfig: UiConfig =
   network === "polygon"
     ? {
-        helloWorldContractAddress: "0xCAE0AD610762F917E249E26a64ac06bcDE926d9c",
-        helloWorldContractStartBlock: 50547287,
         openActionContractAddress: "0xc8e3fc432ef2ed91981fc598e34ad7f4fa880049",
         openActionContractStartBlock: 50547287,
         lensHubProxyAddress: "0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d",
@@ -37,9 +33,7 @@ export const uiConfig: UiConfig =
         }`,
       }
     : {
-        helloWorldContractAddress: "0x4ae4400c4f965F818f3E0b66e9b0ef5721146Bc0",
-        helloWorldContractStartBlock: 42984295,
-        openActionContractAddress: "0x002937e6f30d5a6cf205e60029432d5853c9614f",
+        openActionContractAddress: "0x6ff7d6ef87e5cbd79ac779487bdce7b469aaec9f",
         openActionContractStartBlock: 43138280,
         lensHubProxyAddress: "0x4fbffF20302F3326B20052ab9C217C44F6480900",
         collectActionContractAddress:
