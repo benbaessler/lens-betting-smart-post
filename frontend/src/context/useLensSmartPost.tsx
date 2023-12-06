@@ -1,33 +1,35 @@
 import { ReactNode, FC, useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
-import LensHelloWorldContext from "./LensHelloWorldContext";
+import LensSmartPostContext from "./LensSmartPostContext";
 import {
-  GreetEvent,
-  GreetEventFormatted,
   PostCreatedEvent,
   PostCreatedEventFormatted,
   convertPostEventToSerializable,
-  convertGreetEventToSerializable,
+  convertBetCreatedEventToSerializable,
   LoginData,
+  BetCreatedEvent,
+  BetCreatedEventFormatted,
 } from "../utils/types";
 import { network, uiConfig } from "../utils/constants";
 import { publicClient } from "../main";
 import { lensHubEventsAbi } from "../utils/lensHubEventsAbi";
-import { helloWorldAbi } from "../utils/helloWorldAbi";
+import { smartPostAbi } from "../utils/smartPostAbi";
 import { disconnect } from "wagmi/actions";
 
-interface LensHelloWorldProviderProps {
+interface LensSmartPostProviderProps {
   children: ReactNode;
 }
 
-export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
+export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
   children,
 }) => {
+  const [betsCreated, setBetsCreated] = useState<BetCreatedEventFormatted[]>(
+    []
+  );
   const [handle, setHandle] = useState<string | undefined>();
   const [profileId, setProfileId] = useState<number | undefined>();
   const { address } = useAccount();
   const [posts, setPosts] = useState<PostCreatedEventFormatted[]>([]);
-  const [greetings, setGreetings] = useState<GreetEventFormatted[]>([]);
   const [loading, setLoading] = useState(false);
   const [loginData, setLoginData] = useState<LoginData>();
 
@@ -44,16 +46,16 @@ export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
     const savedPostEvents: PostCreatedEventFormatted[] = JSON.parse(
       localStorage.getItem("postEvents") || "[]"
     );
-    const savedHelloWorldEvents: GreetEventFormatted[] = JSON.parse(
-      localStorage.getItem("helloWorldEvents") || "[]"
+    const savedSmartPostEvents: BetCreatedEventFormatted[] = JSON.parse(
+      localStorage.getItem("BetCreatedEvents") || "[]"
     );
 
     if (savedPostEvents.length) {
       setPosts(savedPostEvents);
     }
 
-    if (savedHelloWorldEvents) {
-      setGreetings(savedHelloWorldEvents);
+    if (savedSmartPostEvents) {
+      setBetsCreated(savedSmartPostEvents);
     }
 
     const startBlock = savedCurrentBlock
@@ -67,8 +69,8 @@ export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
     const postEventsMap = new Map(
       savedPostEvents.map((event) => [event.transactionHash, event])
     );
-    const helloWorldEventsMap = new Map(
-      savedHelloWorldEvents.map((event) => [event.transactionHash, event])
+    const smartPostEventsMap = new Map(
+      savedSmartPostEvents.map((event) => [event.transactionHash, event])
     );
 
     for (let i = startBlock; i < currentBlock; i += 2000) {
@@ -84,19 +86,19 @@ export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
         toBlock: BigInt(toBlock),
       });
 
-      const helloWorldEvents = await publicClient({
+      const smartPostEvents = await publicClient({
         chainId,
       }).getContractEvents({
-        address: uiConfig.helloWorldContractAddress,
-        abi: helloWorldAbi,
-        eventName: "Greet",
+        address: uiConfig.openActionContractAddress,
+        abi: smartPostAbi,
+        eventName: "BetCreated",
         fromBlock: BigInt(i),
         toBlock: BigInt(toBlock),
       });
 
       const postEventsParsed = postEvents as unknown as PostCreatedEvent[];
-      const helloWorldEventsParsed =
-        helloWorldEvents as unknown as GreetEvent[];
+      const smartPostEventsParsed =
+        smartPostEvents as unknown as BetCreatedEvent[];
 
       const filteredEvents = postEventsParsed.filter((event) => {
         return event.args.postParams.actionModules.includes(
@@ -108,30 +110,27 @@ export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
         convertPostEventToSerializable(event)
       );
 
-      const serializableGreetEvents = helloWorldEventsParsed.map((event) =>
-        convertGreetEventToSerializable(event)
+      const serializableBetCreatedEvents = smartPostEventsParsed.map((event) =>
+        convertBetCreatedEventToSerializable(event)
       );
 
       serializablePostEvents.forEach((event) =>
         postEventsMap.set(event.transactionHash, event)
       );
-      serializableGreetEvents.forEach((event) =>
-        helloWorldEventsMap.set(event.transactionHash, event)
+      serializableBetCreatedEvents.forEach((event) =>
+        smartPostEventsMap.set(event.transactionHash, event)
       );
     }
 
     const allPostEvents = Array.from(postEventsMap.values());
-    const allHelloWorldEvents = Array.from(helloWorldEventsMap.values());
+    const allSmartPostEvents = Array.from(smartPostEventsMap.values());
 
     localStorage.setItem("currentBlock", currentBlock.toString());
     localStorage.setItem("postEvents", JSON.stringify(allPostEvents));
-    localStorage.setItem(
-      "helloWorldEvents",
-      JSON.stringify(allHelloWorldEvents)
-    );
+    localStorage.setItem("SmartPostEvents", JSON.stringify(allSmartPostEvents));
 
     setPosts(allPostEvents);
-    setGreetings(allHelloWorldEvents);
+    setBetsCreated(allSmartPostEvents);
     setLoading(false);
   }, []);
 
@@ -170,13 +169,13 @@ export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
   }, [address]);
 
   return (
-    <LensHelloWorldContext.Provider
+    <LensSmartPostContext.Provider
       value={{
         profileId,
         handle,
+        betsCreated,
         address,
         posts,
-        greetings,
         refresh,
         clear: () => {
           setProfileId(undefined);
@@ -193,6 +192,6 @@ export const LensHelloWorldProvider: FC<LensHelloWorldProviderProps> = ({
       }}
     >
       {children}
-    </LensHelloWorldContext.Provider>
+    </LensSmartPostContext.Provider>
   );
 };

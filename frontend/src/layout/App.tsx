@@ -2,9 +2,9 @@ import { Home } from "./Home.tsx";
 import { LensConfig, development, production } from "@lens-protocol/react-web";
 import { bindings as wagmiBindings } from "@lens-protocol/wagmi";
 import { LensProvider } from "@lens-protocol/react-web";
-import { LensHelloWorldProvider } from "../context/useLensHelloWorld.tsx";
+import { LensSmartPostProvider } from "../context/useLensSmartPost.tsx";
 import { WalletConnectProvider } from "./WalletConnectProvider.tsx";
-import { useLensHelloWorld } from "../context/LensHelloWorldContext.ts";
+import { useLensSmartPost } from "../context/LensSmartPostContext.ts";
 import { Button } from "@/components/ui/button";
 import { network } from "@/utils/constants.tsx";
 
@@ -17,17 +17,17 @@ export const App = () => {
   return (
     <WalletConnectProvider>
       <LensProvider config={lensConfig}>
-        <LensHelloWorldProvider>
+        <LensSmartPostProvider>
           <Nav />
           <Home />
-        </LensHelloWorldProvider>
+        </LensSmartPostProvider>
       </LensProvider>
     </WalletConnectProvider>
   );
 };
 
 function Nav() {
-  const { handle, clear, disconnect } = useLensHelloWorld();
+  const { handle, clear, disconnect } = useLensSmartPost();
 
   return (
     <nav className="flex flex-1 border-b">

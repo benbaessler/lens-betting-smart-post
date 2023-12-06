@@ -1,13 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { usePublications } from "@lens-protocol/react-web";
 import { useState } from "react";
 import { encodeAbiParameters, encodeFunctionData, zeroAddress } from "viem";
 import { useWalletClient } from "wagmi";
-import { useLensHelloWorld } from "../context/LensHelloWorldContext";
+import { useLensSmartPost } from "../context/LensSmartPostContext";
 import { publicClient } from "../main";
 import { mode, uiConfig } from "../utils/constants";
-import { fetchInitMessage } from "../utils/fetchInitMessage";
 import { lensHubAbi } from "../utils/lensHubAbi";
 import { serializeLink } from "../utils/serializeLink";
 import { PostCreatedEventFormatted } from "../utils/types";
@@ -24,19 +22,14 @@ const ActionBox = ({
   profileId?: number;
   refresh: () => void;
 }) => {
-  const [actionText, setActionText] = useState<string>("");
   const [createState, setCreateState] = useState<string | undefined>();
   const [txHash, setTxHash] = useState<string | undefined>();
   const { data: walletClient } = useWalletClient();
 
-  const executeHelloWorld = async (
+  const executeSmartPost = async (
     post: PostCreatedEventFormatted,
-    actionText: string
   ) => {
-    const encodedActionData = encodeAbiParameters(
-      [{ type: "string" }],
-      [actionText]
-    );
+    const encodedActionData = encodeAbiParameters([], []);
 
     const args = {
       publicationActedProfileId: BigInt(post.args.postParams.profileId || 0),
@@ -137,7 +130,7 @@ const ActionBox = ({
       <div className="flex flex-col justify-center items-center">
         <p>ProfileID: {post.args.postParams.profileId}</p>
         <p>PublicationID: {post.args.pubId}</p>
-        <p>Initialize Message: {fetchInitMessage(post)}</p>
+        {/* <p>Initialize Message: {fetchInitMessage(post)}</p> */}
         <img
           className="my-3 rounded-2xl"
           src={serializeLink(post.args.postParams.contentURI)}
@@ -152,22 +145,10 @@ const ActionBox = ({
           </a>
         </Button>
       </div>
-      <div>
-        <p className="mb-3">
-          Action message (will be emitted in HelloWorld event)
-        </p>
-        <Input
-          id={`initializeTextId-${post.args.pubId}`}
-          type="text"
-          value={actionText}
-          onChange={(e) => setActionText(e.target.value)}
-          disabled={!profileId}
-        />
-      </div>
       {profileId && (
         <Button
           className="mt-3"
-          onClick={() => executeHelloWorld(post, actionText)}
+          onClick={() => executeSmartPost(post)}
         >
           Post Message
         </Button>
@@ -198,12 +179,12 @@ const ActionBox = ({
 
 export const Actions = () => {
   const [filterOwnPosts, setFilterOwnPosts] = useState(false);
-  const { address, profileId, posts, refresh, loading } = useLensHelloWorld();
+  const { address, profileId, posts, refresh, loading } = useLensSmartPost();
   //const profileIdString = profileId ? "0x" + profileId.toString(16) : "0x0";
   const { data } = usePublications({
     where: {
       //from: [profileIdString as ProfileId],
-      withOpenActions: [{ address: uiConfig.helloWorldContractAddress }],
+      withOpenActions: [{ address: uiConfig.openActionContractAddress }],
     },
   });
   console.log(data);

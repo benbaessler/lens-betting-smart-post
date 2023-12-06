@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLensHelloWorld } from "../context/LensHelloWorldContext";
+import { useLensSmartPost } from "../context/LensSmartPostContext";
 import { encodeAbiParameters, encodeFunctionData, zeroAddress } from "viem";
 import { uiConfig } from "../utils/constants";
 import { lensHubAbi } from "../utils/lensHubAbi";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export const Create = () => {
-  const { address, profileId, refresh } = useLensHelloWorld();
+  const { address, profileId, refresh } = useLensSmartPost();
   const { data: walletClient } = useWalletClient();
   const [createState, setCreateState] = useState<string | undefined>();
   const [freeCollect, setFreeCollect] = useState<boolean>(false);
@@ -20,15 +20,6 @@ export const Create = () => {
   const [jurorProfileId, setJurorProfileId] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [deadline, setDeadline] = useState<string>("");
-
-  // const requestAllowance = async (address: string, amount: number) => {
-  //   const data = await publicClient.requestAllowance({
-  //     address,
-  //     amount,
-  //     tokenAddress: uiConfig.openActionContractAddress,
-  //     abi: ERC20ABI,
-  //   });
-  // };
 
   const createPost = async () => {
     // request token allowance from user for BigInt(amount) of WMATIC
