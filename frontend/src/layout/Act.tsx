@@ -1,5 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { usePublications } from "@lens-protocol/react-web";
+import {
+  Post,
+  Comment,
+  Quote,
+  usePublications,
+} from "@lens-protocol/react-web";
 import { useState } from "react";
 import { encodeAbiParameters, encodeFunctionData, zeroAddress } from "viem";
 import { useWalletClient } from "wagmi";
@@ -8,8 +13,9 @@ import { publicClient } from "../main";
 import { mode, uiConfig } from "../utils/constants";
 import { lensHubAbi } from "../utils/lensHubAbi";
 import { serializeLink } from "../utils/serializeLink";
-import { PostCreatedEventFormatted } from "../utils/types";
 //import { ProfileId } from "@lens-protocol/metadata";
+
+export type ActionPost = Post | Comment | Quote;
 
 const ActionBox = ({
   post,
@@ -17,7 +23,7 @@ const ActionBox = ({
   profileId,
   refresh,
 }: {
-  post: PostCreatedEventFormatted;
+  post: Post | Comment | Quote;
   address?: `0x${string}`;
   profileId?: number;
   refresh: () => void;
@@ -26,14 +32,12 @@ const ActionBox = ({
   const [txHash, setTxHash] = useState<string | undefined>();
   const { data: walletClient } = useWalletClient();
 
-  const executeSmartPost = async (
-    post: PostCreatedEventFormatted,
-  ) => {
+  const executeSmartPost = async (post: Post | Comment | Quote) => {
     const encodedActionData = encodeAbiParameters([], []);
 
     const args = {
-      publicationActedProfileId: BigInt(post.args.postParams.profileId || 0),
-      publicationActedId: BigInt(post.args.pubId),
+      publicationActedProfileId: BigInt(parseInt(post.by.id, 16) || 0),
+      publicationActedId: BigInt(post.id.split('-')[1]),
       actorProfileId: BigInt(profileId || 0),
       referrerProfileIds: [],
       referrerPubIds: [],
@@ -70,7 +74,7 @@ const ActionBox = ({
     }
   };
 
-  const executeCollect = async (post: PostCreatedEventFormatted) => {
+  const executeCollect = async (post: Post | Comment | Quote) => {
     const baseFeeCollectModuleTypes = [
       { type: "address" },
       { type: "uint256" },
@@ -87,8 +91,8 @@ const ActionBox = ({
     );
 
     const args = {
-      publicationActedProfileId: BigInt(post.args.postParams.profileId || 0),
-      publicationActedId: BigInt(post.args.pubId),
+      publicationActedProfileId: BigInt(parseInt(post.by.id, 16) || 0),
+      publicationActedId: BigInt(post.id),
       actorProfileId: BigInt(profileId || 0),
       referrerProfileIds: [],
       referrerPubIds: [],
@@ -128,17 +132,17 @@ const ActionBox = ({
   return (
     <div className="flex flex-col border rounded-xl px-5 py-3 mb-3 justify-center">
       <div className="flex flex-col justify-center items-center">
-        <p>ProfileID: {post.args.postParams.profileId}</p>
-        <p>PublicationID: {post.args.pubId}</p>
+        <p>ProfileID: {post.by.id}</p>
+        <p>PublicationID: {post.id}</p>
         {/* <p>Initialize Message: {fetchInitMessage(post)}</p> */}
         <img
           className="my-3 rounded-2xl"
-          src={serializeLink(post.args.postParams.contentURI)}
+          src={serializeLink(post.metadata.rawURI)}
           alt="Post"
         />
         <Button asChild variant="link">
           <a
-            href={`${uiConfig.blockExplorerLink}${post.transactionHash}`}
+            href={`${uiConfig.blockExplorerLink}${post.txHash}`}
             target="_blank"
           >
             Txn Link
@@ -146,17 +150,14 @@ const ActionBox = ({
         </Button>
       </div>
       {profileId && (
-        <Button
-          className="mt-3"
-          onClick={() => executeSmartPost(post)}
-        >
-          Post Message
+        <Button className="mt-3" onClick={() => executeSmartPost(post)}>
+          Accept bet
         </Button>
       )}
       {profileId &&
-        post.args.postParams.actionModules.includes(
-          uiConfig.collectActionContractAddress
-        ) && (
+        post.openActionModules
+          ?.map((module) => module.contract.address)
+          .includes(uiConfig.collectActionContractAddress) && (
           <Button className="mt-3" onClick={() => executeCollect(post)}>
             Collect Post
           </Button>
@@ -179,28 +180,31 @@ const ActionBox = ({
 
 export const Actions = () => {
   const [filterOwnPosts, setFilterOwnPosts] = useState(false);
-  const { address, profileId, posts, refresh, loading } = useLensSmartPost();
+  const { address, profileId, refresh, loading } = useLensSmartPost();
   //const profileIdString = profileId ? "0x" + profileId.toString(16) : "0x0";
+  console.log(uiConfig.openActionContractAddress);
   const { data } = usePublications({
     where: {
       //from: [profileIdString as ProfileId],
       withOpenActions: [{ address: uiConfig.openActionContractAddress }],
     },
   });
-  console.log(data);
-  const activePosts = mode === "api" ? [] : posts;
+  const activePosts = mode === "api" ? [] : data;
 
-  let filteredPosts = filterOwnPosts
-    ? activePosts.filter(
-        (post) => post.args.postParams.profileId === profileId?.toString()
-      )
-    : activePosts;
+  const filteredPosts = (activePosts || []) as ActionPost[];
+  // if (filteredPosts) {
+  //   console.log(filteredPosts, parseInt(filteredPosts[0].by.id, 16).toString());
+  // }
 
-  filteredPosts = filteredPosts.sort((a, b) => {
-    const blockNumberA = parseInt(a.blockNumber, 10);
-    const blockNumberB = parseInt(b.blockNumber, 10);
-    return blockNumberB - blockNumberA;
-  });
+  // let filteredPosts =
+  //   filterOwnPosts && data
+  //     ? data.filter(
+  //         (post) =>
+  //           parseInt(post.by.id, 16).toString() === profileId?.toString()
+  //       )
+  //     : activePosts;
+
+  // filteredPosts = activePosts!.sort((a, b) => Number(a.createdAt) - Number(b.createdAt));
 
   return (
     <>
