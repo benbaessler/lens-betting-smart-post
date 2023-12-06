@@ -46,16 +46,16 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
     const savedPostEvents: PostCreatedEventFormatted[] = JSON.parse(
       localStorage.getItem("postEvents") || "[]"
     );
-    const savedSmartPostEvents: BetCreatedEventFormatted[] = JSON.parse(
-      localStorage.getItem("BetCreatedEvents") || "[]"
+    const savedBetCreatedEvents: BetCreatedEventFormatted[] = JSON.parse(
+      localStorage.getItem("betCreatedEvents") || "[]"
     );
 
     if (savedPostEvents.length) {
       setPosts(savedPostEvents);
     }
 
-    if (savedSmartPostEvents) {
-      setBetsCreated(savedSmartPostEvents);
+    if (savedBetCreatedEvents) {
+      setBetsCreated(savedBetCreatedEvents);
     }
 
     const startBlock = savedCurrentBlock
@@ -66,11 +66,14 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
       chainId,
     }).getBlockNumber();
 
+    console.log(currentBlock);
+
     const postEventsMap = new Map(
       savedPostEvents.map((event) => [event.transactionHash, event])
     );
-    const smartPostEventsMap = new Map(
-      savedSmartPostEvents.map((event) => [event.transactionHash, event])
+
+    const betCreatedEventsMap = new Map(
+      savedBetCreatedEvents.map((event) => [event.transactionHash, event])
     );
 
     for (let i = startBlock; i < currentBlock; i += 2000) {
@@ -86,7 +89,7 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
         toBlock: BigInt(toBlock),
       });
 
-      const smartPostEvents = await publicClient({
+      const betCreatedEvents = await publicClient({
         chainId,
       }).getContractEvents({
         address: uiConfig.openActionContractAddress,
@@ -97,8 +100,8 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
       });
 
       const postEventsParsed = postEvents as unknown as PostCreatedEvent[];
-      const smartPostEventsParsed =
-        smartPostEvents as unknown as BetCreatedEvent[];
+      const betCreatedEventsParsed =
+        betCreatedEvents as unknown as BetCreatedEvent[];
 
       const filteredEvents = postEventsParsed.filter((event) => {
         return event.args.postParams.actionModules.includes(
@@ -110,7 +113,7 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
         convertPostEventToSerializable(event)
       );
 
-      const serializableBetCreatedEvents = smartPostEventsParsed.map((event) =>
+      const serializableBetCreatedEvents = betCreatedEventsParsed.map((event) =>
         convertBetCreatedEventToSerializable(event)
       );
 
@@ -118,19 +121,19 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
         postEventsMap.set(event.transactionHash, event)
       );
       serializableBetCreatedEvents.forEach((event) =>
-        smartPostEventsMap.set(event.transactionHash, event)
+        betCreatedEventsMap.set(event.transactionHash, event)
       );
     }
 
     const allPostEvents = Array.from(postEventsMap.values());
-    const allSmartPostEvents = Array.from(smartPostEventsMap.values());
+    const allBetCreatedEvents = Array.from(betCreatedEventsMap.values());
 
     localStorage.setItem("currentBlock", currentBlock.toString());
     localStorage.setItem("postEvents", JSON.stringify(allPostEvents));
-    localStorage.setItem("SmartPostEvents", JSON.stringify(allSmartPostEvents));
+    localStorage.setItem("betCreatedEvents", JSON.stringify(allBetCreatedEvents));
 
     setPosts(allPostEvents);
-    setBetsCreated(allSmartPostEvents);
+    setBetsCreated(allBetCreatedEvents);
     setLoading(false);
   }, []);
 
