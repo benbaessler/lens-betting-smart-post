@@ -2,7 +2,7 @@ import "../styles/Action.css";
 import { useLogin, useProfiles } from "@lens-protocol/react-web";
 import { Actions } from "./Act";
 import { Events } from "./Events";
-import { useLensHelloWorld } from "../context/LensHelloWorldContext";
+import { useLensSmartPost } from "../context/LensSmartPostContext";
 import { Create } from "./Create";
 import { useEffect, useState } from "react";
 import { LoginData } from "../utils/types";
@@ -13,7 +13,7 @@ import { network } from "@/utils/constants";
 
 export const Home = () => {
   const [activeSection, setActiveSection] = useState<string>("create");
-  const { address, handle, connect, disconnect } = useLensHelloWorld();
+  const { address, handle, connect, disconnect } = useLensSmartPost();
   const { open } = useWeb3Modal();
   const { execute: executeLogin, data: loginData } = useLogin();
   const [connected, setConnected] = useState(false);
