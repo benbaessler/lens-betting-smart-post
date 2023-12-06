@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useLensSmartPost } from "../context/LensSmartPostContext";
-import { encodeAbiParameters, encodeFunctionData, zeroAddress } from "viem";
+import {
+  encodeAbiParameters,
+  encodeFunctionData,
+  zeroAddress,
+  parseEther,
+} from "viem";
 import { uiConfig } from "../utils/constants";
 import { lensHubAbi } from "../utils/lensHubAbi";
 import { useWalletClient } from "wagmi";
@@ -22,6 +27,8 @@ export const Create = () => {
   const [deadline, setDeadline] = useState<string>("");
 
   const createPost = async () => {
+    console.log(parseEther(amount));
+
     // request token allowance from user for BigInt(amount) of WMATIC
     // this is needed because the open action contract will transfer the amount from the user
 
@@ -38,7 +45,7 @@ export const Create = () => {
         BigInt(jurorProfileId),
         // WMATIC on Mumbai
         "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-        BigInt(amount),
+        BigInt(parseEther(amount)),
         BigInt(deadline),
       ]
     );
@@ -125,23 +132,21 @@ export const Create = () => {
                 placeholder="URI"
                 onChange={(e) => setURI(e.target.value)}
               />
-              <p className="my-2">Challenged profile ID</p>
+              <p className="my-2">Challenged user</p>
               <Input
-                placeholder="Profile ID"
+                placeholder="lens/user"
                 type="number"
                 value={challengedProfileId}
                 onChange={(e) => setChallengedProfileId(e.target.value)}
               />
-              <p className="my-2">
-                Juror profile ID (this user will decide the outcome of the bet)
-              </p>
+              <p className="my-2">Judge (will decide the outcome of the bet)</p>
               <Input
-                placeholder="Profile ID"
+                placeholder="lens/judge"
                 type="number"
                 value={jurorProfileId}
                 onChange={(e) => setJurorProfileId(e.target.value)}
               />
-              <p className="my-2">Bet amount (MATIC)</p>
+              <p className="my-2">Bet amount</p>
               <Input
                 placeholder="Amount"
                 type="number"
