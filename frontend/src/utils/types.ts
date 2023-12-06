@@ -38,19 +38,29 @@ export type PostCreatedEventFormatted = {
     transactionHash: string;
 };
 
-export type GreetEvent = {
+export type BetCreatedEvent = {
     args: {
-        message: string;
-        actor: string;
+        pubId: number;
+        profileId: number;
+        userId: number;
+        jurorId: number;
+        currency: string;
+        amount: number;
+        timestamp: number;
     }
     blockNumber: number;
     transactionHash: string;
 }
 
-export type GreetEventFormatted = {
+export type BetCreatedEventFormatted = {
     args: {
-        message: string;
-        actor: string;
+        pubId: number;
+        profileId: number;
+        userId: number;
+        jurorId: number;
+        currency: string;
+        amount: number;
+        timestamp: number;
     }
     blockNumber: string;
     transactionHash: string;
@@ -74,9 +84,9 @@ export function convertPostEventToSerializable(
     };
 }
 
-export function convertGreetEventToSerializable(
-    event: GreetEvent
-): GreetEventFormatted {
+export function convertBetCreatedEventToSerializable(
+    event: BetCreatedEvent
+): BetCreatedEventFormatted {
     return {
         ...event,
         blockNumber: event.blockNumber.toString(),
