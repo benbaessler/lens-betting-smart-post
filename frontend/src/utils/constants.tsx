@@ -33,8 +33,8 @@ export const uiConfig: UiConfig =
         }`,
       }
     : {
-        openActionContractAddress: "0x6ff7d6ef87e5cbd79ac779487bdce7b469aaec9f",
-        openActionContractStartBlock: 43138280,
+        openActionContractAddress: "0x03fa0DCFDCFff5faC6303B7D8570905EE3195c15",
+        openActionContractStartBlock: 43215182,
         lensHubProxyAddress: "0x4fbffF20302F3326B20052ab9C217C44F6480900",
         collectActionContractAddress:
           "0x4FdAae7fC16Ef41eAE8d8f6578d575C9d64722f2",

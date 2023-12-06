@@ -12,8 +12,7 @@ import { useLensSmartPost } from "../context/LensSmartPostContext";
 import { publicClient } from "../main";
 import { mode, uiConfig } from "../utils/constants";
 import { lensHubAbi } from "../utils/lensHubAbi";
-import { serializeLink } from "../utils/serializeLink";
-//import { ProfileId } from "@lens-protocol/metadata";
+import { Publication } from "@lens-protocol/widgets-react";
 
 export type ActionPost = Post | Comment | Quote;
 
@@ -37,7 +36,7 @@ const ActionBox = ({
 
     const args = {
       publicationActedProfileId: BigInt(parseInt(post.by.id, 16) || 0),
-      publicationActedId: BigInt(post.id.split('-')[1]),
+      publicationActedId: BigInt(post.id.split("-")[1]),
       actorProfileId: BigInt(profileId || 0),
       referrerProfileIds: [],
       referrerPubIds: [],
@@ -130,51 +129,37 @@ const ActionBox = ({
   };
 
   return (
-    <div className="flex flex-col border rounded-xl px-5 py-3 mb-3 justify-center">
-      <div className="flex flex-col justify-center items-center">
-        <p>ProfileID: {post.by.id}</p>
-        <p>PublicationID: {post.id}</p>
-        {/* <p>Initialize Message: {fetchInitMessage(post)}</p> */}
-        <img
-          className="my-3 rounded-2xl"
-          src={serializeLink(post.metadata.rawURI)}
-          alt="Post"
-        />
-        <Button asChild variant="link">
-          <a
-            href={`${uiConfig.blockExplorerLink}${post.txHash}`}
-            target="_blank"
-          >
-            Txn Link
-          </a>
-        </Button>
-      </div>
-      {profileId && (
-        <Button className="mt-3" onClick={() => executeSmartPost(post)}>
-          Accept bet
-        </Button>
-      )}
-      {profileId &&
-        post.openActionModules
-          ?.map((module) => module.contract.address)
-          .includes(uiConfig.collectActionContractAddress) && (
-          <Button className="mt-3" onClick={() => executeCollect(post)}>
-            Collect Post
+    <>
+      <div className="flex flex-col border rounded-xl px-5 py-3 mb-3 justify-center">
+        <h1>{post.txHash}</h1>
+        <Publication publicationId={post.id} />
+        {profileId && (
+          <Button className="mt-3" onClick={() => executeSmartPost(post)}>
+            Accept bet
           </Button>
         )}
-      {createState && (
-        <p className="mt-2 text-primary create-state-text">{createState}</p>
-      )}
-      {txHash && (
-        <a
-          href={`${uiConfig.blockExplorerLink}${txHash}`}
-          target="_blank"
-          className="block-explorer-link"
-        >
-          Block Explorer Link
-        </a>
-      )}
-    </div>
+        {profileId &&
+          post.openActionModules
+            ?.map((module) => module.contract.address)
+            .includes(uiConfig.collectActionContractAddress) && (
+            <Button className="mt-3" onClick={() => executeCollect(post)}>
+              Collect Post
+            </Button>
+          )}
+        {createState && (
+          <p className="mt-2 text-primary create-state-text">{createState}</p>
+        )}
+        {txHash && (
+          <a
+            href={`${uiConfig.blockExplorerLink}${txHash}`}
+            target="_blank"
+            className="block-explorer-link"
+          >
+            Block Explorer Link
+          </a>
+        )}
+      </div>
+    </>
   );
 };
 
@@ -182,7 +167,6 @@ export const Actions = () => {
   const [filterOwnPosts, setFilterOwnPosts] = useState(false);
   const { address, profileId, refresh, loading } = useLensSmartPost();
   //const profileIdString = profileId ? "0x" + profileId.toString(16) : "0x0";
-  console.log(uiConfig.openActionContractAddress);
   const { data } = usePublications({
     where: {
       //from: [profileIdString as ProfileId],
