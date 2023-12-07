@@ -34,6 +34,11 @@ library BetTypes {
         uint256 outcome;
     }
 
+    struct PubParams {
+        uint256 profileId;
+        uint256 pubId;
+    }
+
     struct InitActionParams {
         uint256 userId;
         uint256 jurorId;
@@ -53,6 +58,8 @@ contract BetOpenAction is
 
     mapping(uint256 profileId => mapping(uint256 pubId => BetTypes.Bet))
         public bets;
+
+    mapping(uint256 profileId => BetTypes.PubParams[]) public betsByProfile;
 
     error CurrencyNotWhitelisted();
     error DeadlineInPast();
@@ -162,6 +169,14 @@ contract BetOpenAction is
             0
         );
 
+        BetTypes.PubParams memory pubParams = BetTypes.PubParams(
+            profileId,
+            pubId
+        );
+
+        betsByProfile[profileId].push(pubParams);
+        betsByProfile[params.userId].push(pubParams);
+
         emit BetCreated(
             pubId,
             profileId,
@@ -208,6 +223,7 @@ contract BetOpenAction is
 
         address creatorAddress = LENS_HUB.ownerOf(profileId);
         address userAddress = LENS_HUB.ownerOf(bet.userId);
+        
         if (creatorAddress != msg.sender && userAddress != msg.sender)
             revert InvalidCaller();
 
@@ -224,6 +240,11 @@ contract BetOpenAction is
             if (bet.userStaked) revert ActionAlreadyExecuted();
             if (!bet.accepted) revert BetNotAccepted();
             bet.userStaked = true;
+        }
+
+        if (bet.userStaked && bet.creatorStaked) {
+            bet.active = true;
+            emit BetActivated(pubId, profileId, bet.userId);
         }
 
         emit BetStaked(pubId, profileId, stakerId);
@@ -292,5 +313,18 @@ contract BetOpenAction is
         }
 
         emit BetFinalized(pubId, profileId, outcome);
+    }
+
+    /// @notice gets all bets for a profile
+    /// @param profileId: profile id of the profile
+    function getBets(
+        uint256 profileId
+    ) public view returns (BetTypes.Bet[] memory _bets) {
+        BetTypes.PubParams[] memory pubParams = betsByProfile[profileId];
+        _bets = new BetTypes.Bet[](pubParams.length);
+
+        for (uint256 i = 0; i < pubParams.length; i++) {
+            _bets[i] = bets[profileId][pubParams[i].pubId];
+        }
     }
 }
