@@ -66,8 +66,6 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
       chainId,
     }).getBlockNumber();
 
-    console.log(currentBlock);
-
     const postEventsMap = new Map(
       savedPostEvents.map((event) => [event.transactionHash, event])
     );
@@ -130,7 +128,10 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
 
     localStorage.setItem("currentBlock", currentBlock.toString());
     localStorage.setItem("postEvents", JSON.stringify(allPostEvents));
-    localStorage.setItem("betCreatedEvents", JSON.stringify(allBetCreatedEvents));
+    localStorage.setItem(
+      "betCreatedEvents",
+      JSON.stringify(allBetCreatedEvents)
+    );
 
     setPosts(allPostEvents);
     setBetsCreated(allBetCreatedEvents);
@@ -143,10 +144,10 @@ export const LensSmartPostProvider: FC<LensSmartPostProviderProps> = ({
 
   useEffect(() => {
     if (loginData) {
-      setHandle(loginData!.handle!.localName);
+      setHandle(loginData!.handle!.fullHandle);
       setProfileId(parseInt(loginData!.id, 16));
 
-      localStorage.setItem("handle", loginData!.handle!.localName);
+      localStorage.setItem("handle", loginData!.handle!.fullHandle);
       localStorage.setItem("profileId", loginData!.id);
       localStorage.setItem("address", loginData.ownedBy.address);
     }

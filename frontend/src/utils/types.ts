@@ -95,6 +95,7 @@ export function convertBetCreatedEventToSerializable(
 
 export type LoginData = {
     handle: {
+        fullHandle: string;
         localName: string;
     };
     id: string;
