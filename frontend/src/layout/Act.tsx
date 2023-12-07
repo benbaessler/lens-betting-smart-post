@@ -1,20 +1,25 @@
 import { Button } from "@/components/ui/button";
 import {
-  Post,
-  Comment,
-  Quote,
-  usePublications,
+  PublicationId,
+  usePublication,
+  useProfile,
+  ProfileId,
 } from "@lens-protocol/react-web";
 import { useState } from "react";
-import { encodeAbiParameters, encodeFunctionData, zeroAddress } from "viem";
-import { useWalletClient } from "wagmi";
+import {
+  encodeAbiParameters,
+  encodeFunctionData,
+  zeroAddress,
+  formatUnits,
+} from "viem";
+import { useWalletClient, useContractRead } from "wagmi";
 import { useLensSmartPost } from "../context/LensSmartPostContext";
 import { publicClient } from "../main";
 import { mode, uiConfig } from "../utils/constants";
 import { lensHubAbi } from "../utils/lensHubAbi";
-import { Publication } from "@lens-protocol/widgets-react";
-
-export type ActionPost = Post | Comment | Quote;
+import { PostCreatedEventFormatted } from "../utils/types";
+import { numberToHex } from "@/lib/utils";
+import { smartPostAbi } from "@/utils/smartPostAbi";
 
 const ActionBox = ({
   post,
@@ -22,21 +27,42 @@ const ActionBox = ({
   profileId,
   refresh,
 }: {
-  post: Post | Comment | Quote;
+  post: PostCreatedEventFormatted;
   address?: `0x${string}`;
   profileId?: number;
   refresh: () => void;
 }) => {
   const [createState, setCreateState] = useState<string | undefined>();
   const [txHash, setTxHash] = useState<string | undefined>();
+
+  const bet = useContractRead({
+    address: uiConfig.openActionContractAddress,
+    abi: smartPostAbi,
+    functionName: "bets",
+    args: [post.args.postParams.profileId, post.args.pubId],
+  }).data;
+
+  const { data: publication } = usePublication({
+    forId: `${numberToHex(
+      parseInt(post.args.postParams.profileId)
+    )}-${numberToHex(parseInt(post.args.pubId))}` as PublicationId,
+  });
+
+  const { data: userProfile } = useProfile({
+    forProfileId: numberToHex(bet![1]) as ProfileId,
+  });
+  const { data: judgeProfile } = useProfile({
+    forProfileId: numberToHex(bet![2]) as ProfileId,
+  });
+
   const { data: walletClient } = useWalletClient();
 
-  const executeSmartPost = async (post: Post | Comment | Quote) => {
+  const executeSmartPost = async (post: PostCreatedEventFormatted) => {
     const encodedActionData = encodeAbiParameters([], []);
 
     const args = {
-      publicationActedProfileId: BigInt(parseInt(post.by.id, 16) || 0),
-      publicationActedId: BigInt(post.id.split("-")[1]),
+      publicationActedProfileId: BigInt(post.args.postParams.profileId || 0),
+      publicationActedId: BigInt(post.args.pubId),
       actorProfileId: BigInt(profileId || 0),
       referrerProfileIds: [],
       referrerPubIds: [],
@@ -73,7 +99,7 @@ const ActionBox = ({
     }
   };
 
-  const executeCollect = async (post: Post | Comment | Quote) => {
+  const executeCollect = async (post: PostCreatedEventFormatted) => {
     const baseFeeCollectModuleTypes = [
       { type: "address" },
       { type: "uint256" },
@@ -90,8 +116,8 @@ const ActionBox = ({
     );
 
     const args = {
-      publicationActedProfileId: BigInt(parseInt(post.by.id, 16) || 0),
-      publicationActedId: BigInt(post.id),
+      publicationActedProfileId: BigInt(post.args.postParams.profileId || 0),
+      publicationActedId: BigInt(post.args.pubId),
       actorProfileId: BigInt(profileId || 0),
       referrerProfileIds: [],
       referrerPubIds: [],
@@ -131,17 +157,20 @@ const ActionBox = ({
   return (
     <>
       <div className="flex flex-col border rounded-xl px-5 py-3 mb-3 justify-center">
-        <h1>{post.txHash}</h1>
-        <Publication publicationId={post.id} />
+        <span>By: {publication?.by.handle?.fullHandle}</span>
+        <span>To: {userProfile?.handle?.fullHandle}</span>
+        <span>To: {judgeProfile?.handle?.fullHandle}</span>
+        <span>Amount: {formatUnits(bet![4], 18).toString()} WMATIC</span>
+        <span>Judge: </span>
         {profileId && (
           <Button className="mt-3" onClick={() => executeSmartPost(post)}>
             Accept bet
           </Button>
         )}
         {profileId &&
-          post.openActionModules
-            ?.map((module) => module.contract.address)
-            .includes(uiConfig.collectActionContractAddress) && (
+          post.args.postParams.actionModules.includes(
+            uiConfig.collectActionContractAddress
+          ) && (
             <Button className="mt-3" onClick={() => executeCollect(post)}>
               Collect Post
             </Button>
@@ -165,30 +194,20 @@ const ActionBox = ({
 
 export const Actions = () => {
   const [filterOwnPosts, setFilterOwnPosts] = useState(false);
-  const { address, profileId, refresh, loading } = useLensSmartPost();
-  //const profileIdString = profileId ? "0x" + profileId.toString(16) : "0x0";
-  const { data } = usePublications({
-    where: {
-      //from: [profileIdString as ProfileId],
-      withOpenActions: [{ address: uiConfig.openActionContractAddress }],
-    },
+  const { address, profileId, refresh, loading, posts } = useLensSmartPost();
+  const activePosts = mode === "api" ? [] : posts;
+
+  let filteredPosts = filterOwnPosts
+    ? activePosts.filter(
+        (post) => post.args.postParams.profileId === profileId?.toString()
+      )
+    : activePosts;
+
+  filteredPosts = filteredPosts.sort((a, b) => {
+    const blockNumberA = parseInt(a.blockNumber, 10);
+    const blockNumberB = parseInt(b.blockNumber, 10);
+    return blockNumberB - blockNumberA;
   });
-  const activePosts = mode === "api" ? [] : data;
-
-  const filteredPosts = (activePosts || []) as ActionPost[];
-  // if (filteredPosts) {
-  //   console.log(filteredPosts, parseInt(filteredPosts[0].by.id, 16).toString());
-  // }
-
-  // let filteredPosts =
-  //   filterOwnPosts && data
-  //     ? data.filter(
-  //         (post) =>
-  //           parseInt(post.by.id, 16).toString() === profileId?.toString()
-  //       )
-  //     : activePosts;
-
-  // filteredPosts = activePosts!.sort((a, b) => Number(a.createdAt) - Number(b.createdAt));
 
   return (
     <>
