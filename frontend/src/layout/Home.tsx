@@ -1,5 +1,5 @@
 import "../styles/Action.css";
-import { useLogin, useProfiles } from "@lens-protocol/react-web";
+import { useLogin, useProfile, useProfiles } from "@lens-protocol/react-web";
 import { Actions } from "./Act";
 import { Events } from "./Events";
 import { useLensSmartPost } from "../context/LensSmartPostContext";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { PenLine, Rows, Activity, LogIn, Unplug } from "lucide-react";
 import { network } from "@/utils/constants";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const Home = () => {
   const [activeSection, setActiveSection] = useState<string>("create");
@@ -67,6 +68,10 @@ function Profiles({
     },
   });
 
+  const { data: profile } = useProfile({
+    forHandle: handle,
+  });
+
   const showNoLensProfiles =
     address && !handle && profiles && profiles.length === 0;
   const showSignInWithLens =
@@ -74,6 +79,16 @@ function Profiles({
 
   return (
     <div className="flex flex-1 justify-center items-center flex-col">
+      <Button variant="outline">
+        <Avatar className="mr-2 h-5 w-5">
+          <AvatarImage
+            src={profile?.metadata?.coverPicture?.optimized?.uri || "none"}
+          />
+          <AvatarFallback>{profile?.handle?.fullHandle}</AvatarFallback>
+        </Avatar>
+        {profile?.handle?.fullHandle}
+      </Button>
+
       <div className="mt-20">
         <h1 className="text-5xl font-geist-black">Betting Smart Post</h1>
       </div>
