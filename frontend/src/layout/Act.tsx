@@ -49,11 +49,13 @@ const ActionBox = ({
   });
 
   const { data: userProfile } = useProfile({
-    forProfileId: numberToHex(bet![1]) as ProfileId,
+    forProfileId: numberToHex(bet![0]) as ProfileId,
   });
   const { data: judgeProfile } = useProfile({
-    forProfileId: numberToHex(bet![2]) as ProfileId,
+    forProfileId: numberToHex(bet![1]) as ProfileId,
   });
+
+  console.log(judgeProfile, userProfile);
 
   const { data: walletClient } = useWalletClient();
 
@@ -157,11 +159,10 @@ const ActionBox = ({
   return (
     <>
       <div className="flex flex-col border rounded-xl px-5 py-3 mb-3 justify-center">
-        <span>By: {publication?.by.handle?.fullHandle}</span>
-        <span>To: {userProfile?.handle?.fullHandle}</span>
-        <span>To: {judgeProfile?.handle?.fullHandle}</span>
+        <span>By: @{publication?.by.handle?.fullHandle}</span>
+        <span>To: @{userProfile?.handle?.fullHandle}</span>
         <span>Amount: {formatUnits(bet![4], 18).toString()} WMATIC</span>
-        <span>Judge: </span>
+        <span>Judge: @{judgeProfile?.handle?.fullHandle}</span>
         {profileId && (
           <Button className="mt-3" onClick={() => executeSmartPost(post)}>
             Accept bet
