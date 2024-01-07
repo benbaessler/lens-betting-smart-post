@@ -11,37 +11,26 @@ import {ILensHub} from "./interfaces/ILensHub.sol";
 import {IModuleRegistry} from "./interfaces/IModuleRegistry.sol";
 
 library BetTypes {
-    /// @param creatorId: profile id of the bet creator
     /// @param userId: profile id of the challenged user
-    /// @param jurorId: profile id of the juror
+    /// @param judgeId: profile id of the judge
     /// @param currency: address of the token used for the bet
     /// @param amount: of required tokens to stake
     /// @param deadline: as unix timestamp
-    /// @param staked: whether the creator has staked
-    /// @param active: whether both parties have staked
+    /// @param active: if both parties have staked
     /// @param outcome: 0 for undecided, 1 for creator, 2 for user
     struct Bet {
-        uint256 creatorId;
         uint256 userId;
-        uint256 jurorId;
+        uint256 judgeId;
         address currency;
         uint256 amount;
         uint256 deadline;
-        bool creatorStaked;
-        bool accepted;
-        bool userStaked;
         bool active;
         uint256 outcome;
     }
 
-    struct PubParams {
-        uint256 profileId;
-        uint256 pubId;
-    }
-
     struct InitActionParams {
         uint256 userId;
-        uint256 jurorId;
+        uint256 judgeId;
         address currency;
         uint256 amount;
         uint256 deadline;
@@ -59,49 +48,30 @@ contract BetOpenAction is
     mapping(uint256 profileId => mapping(uint256 pubId => BetTypes.Bet))
         public bets;
 
-    mapping(uint256 profileId => BetTypes.PubParams[]) public betsByProfile;
-
     error CurrencyNotWhitelisted();
-    error DeadlineInPast();
-    error InvalidJuror();
     error ActionAlreadyExecuted();
+    error InvalidVote();
     error NotStaked();
-    error BetAlreadyActive();
-    error BetAlreadyFinalized();
-    error BetExpired();
     error InvalidCaller();
+    error InvalidDeadline();
+    error InvalidJudge();
+    error InvalidOutcome();
+    error BetAlreadyActive();
+    error BetExpired();
     error BetNotActive();
     error BetNotExpired();
-    error BetNotAccepted();
-    error InvalidOutcome();
 
     event BetCreated(
         uint256 indexed pubId,
         uint256 indexed creatorId,
         uint256 indexed userId,
-        uint256 jurorId,
+        uint256 judgeId,
         address currency,
         uint256 amount,
         uint256 deadline
     );
 
-    event BetStaked(
-        uint256 indexed pubId,
-        uint256 indexed profileId,
-        uint256 indexed stakerId
-    );
-
-    event Unstaked(
-        uint256 indexed pubId,
-        uint256 indexed profileId,
-        uint256 indexed callerId
-    );
-
-    event BetAccepted(
-        uint256 indexed pubId,
-        uint256 indexed profileId,
-        uint256 indexed challengedProfileId
-    );
+    event Unstaked(uint256 indexed pubId, uint256 indexed profileId);
 
     event BetActivated(
         uint256 indexed pubId,
@@ -135,7 +105,7 @@ contract BetOpenAction is
     function initializePublicationAction(
         uint256 profileId,
         uint256 pubId,
-        address,
+        address transactionExecutor,
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         BetTypes.InitActionParams memory params = abi.decode(
@@ -148,46 +118,40 @@ contract BetOpenAction is
         }
 
         if (block.timestamp > params.deadline) {
-            revert DeadlineInPast();
+            revert InvalidDeadline();
         }
 
-        if (params.jurorId == params.userId || params.jurorId == profileId) {
-            revert InvalidJuror();
+        if (params.judgeId == profileId || params.judgeId == params.userId) {
+            revert InvalidJudge();
         }
+
+        IERC20(params.currency).transferFrom(
+            transactionExecutor,
+            address(this),
+            params.amount
+        );
 
         bets[profileId][pubId] = BetTypes.Bet(
-            profileId,
             params.userId,
-            params.jurorId,
+            params.judgeId,
             params.currency,
             params.amount,
             params.deadline,
             false,
-            false,
-            false,
-            false,
             0
         );
-
-        BetTypes.PubParams memory pubParams = BetTypes.PubParams(
-            profileId,
-            pubId
-        );
-
-        betsByProfile[profileId].push(pubParams);
-        betsByProfile[params.userId].push(pubParams);
 
         emit BetCreated(
             pubId,
             profileId,
             params.userId,
-            params.jurorId,
+            params.judgeId,
             params.currency,
             params.amount,
             params.deadline
         );
 
-        return data;
+        return new bytes(0);
     }
 
     function processPublicationAction(
@@ -197,94 +161,60 @@ contract BetOpenAction is
             params.publicationActedId
         ];
 
-        if (bet.accepted) revert ActionAlreadyExecuted();
-        if (bet.deadline < block.timestamp) revert BetExpired();
+        if (bet.active) revert ActionAlreadyExecuted();
+        if (block.timestamp > bet.deadline) revert BetExpired();
         if (bet.userId != params.actorProfileId) revert InvalidCaller();
 
-        bet.accepted = true;
+        IERC20(bet.currency).transferFrom(
+            params.transactionExecutor,
+            address(this),
+            bet.amount
+        );
 
-        emit BetAccepted(
+        bet.active = true;
+
+        emit BetActivated(
             params.publicationActedId,
             params.publicationActedProfileId,
             params.actorProfileId
         );
 
-        return abi.encode(true);
-    }
-
-    /// @notice staker stakes on the bet
-    /// @dev only callable by the bet creator or challenged user
-    function stake(
-        uint256 pubId,
-        uint256 profileId,
-        uint256 stakerId
-    ) external returns (bool) {
-        BetTypes.Bet storage bet = bets[profileId][pubId];
-
-        address creatorAddress = LENS_HUB.ownerOf(profileId);
-        address userAddress = LENS_HUB.ownerOf(bet.userId);
-        
-        if (creatorAddress != msg.sender && userAddress != msg.sender)
-            revert InvalidCaller();
-
-        IERC20(bet.currency).transferFrom(
-            msg.sender,
-            address(this),
-            bet.amount
-        );
-
-        if (creatorAddress == msg.sender) {
-            if (bet.creatorStaked) revert ActionAlreadyExecuted();
-            bet.creatorStaked = true;
-        } else {
-            if (bet.userStaked) revert ActionAlreadyExecuted();
-            if (!bet.accepted) revert BetNotAccepted();
-            bet.userStaked = true;
-        }
-
-        if (bet.userStaked && bet.creatorStaked) {
-            bet.active = true;
-            emit BetActivated(pubId, profileId, bet.userId);
-        }
-
-        emit BetStaked(pubId, profileId, stakerId);
-
-        return true;
+        return new bytes(0);
     }
 
     /// @notice staker unstakes from the bet
     /// @dev only callable by the bet creator or challenged user
-    function unstake(
-        uint256 pubId,
-        uint256 profileId,
-        uint256 callerId
-    ) external returns (bool) {
-        BetTypes.Bet storage bet = bets[profileId][pubId];
+    // function unstake(
+    //     uint256 pubId,
+    //     uint256 profileId,
+    //     uint256 callerId
+    // ) external returns (bool) {
+    //     BetTypes.Bet storage bet = bets[profileId][pubId];
 
-        address creatorAddress = LENS_HUB.ownerOf(profileId);
-        address userAddress = LENS_HUB.ownerOf(bet.userId);
+    //     address creatorAddress = LENS_HUB.ownerOf(profileId);
+    //     address userAddress = LENS_HUB.ownerOf(bet.userId);
 
-        if (creatorAddress != msg.sender && userAddress != msg.sender)
-            revert InvalidCaller();
-        if (bet.active) revert BetAlreadyActive();
+    //     if (creatorAddress != msg.sender && userAddress != msg.sender)
+    //         revert InvalidCaller();
+    //     if (bet.active) revert BetAlreadyActive();
 
-        if (creatorAddress == msg.sender) {
-            if (!bet.creatorStaked) revert NotStaked();
-            bet.creatorStaked = false;
-        } else {
-            if (!bet.userStaked) revert NotStaked();
-            bet.userStaked = false;
-        }
+    //     if (creatorAddress == msg.sender) {
+    //         if (!bet.creatorStaked) revert NotStaked();
+    //         bet.creatorStaked = false;
+    //     } else {
+    //         if (!bet.userStaked) revert NotStaked();
+    //         bet.userStaked = false;
+    //     }
 
-        IERC20(bet.currency).transfer(msg.sender, bet.amount);
+    //     IERC20(bet.currency).transfer(msg.sender, bet.amount);
 
-        emit Unstaked(pubId, profileId, callerId);
+    //     emit Unstaked(pubId, profileId, callerId);
 
-        return true;
-    }
+    //     return true;
+    // }
 
-    /// @notice juror decides the outcome of the bet
-    /// @dev only callable by the bet juror
+    /// @notice judge finalizes the bet by deciding the outcome
+    /// @dev only callable by the bet's judge
     /// @param outcome: 1 for creator, 2 for user
     function finalize(
         uint256 pubId,
@@ -292,39 +222,36 @@ contract BetOpenAction is
         uint256 outcome
     ) external {
         BetTypes.Bet storage bet = bets[profileId][pubId];
+
         if (!bet.active) revert BetNotActive();
-        if (bet.outcome != 0) revert BetAlreadyFinalized();
+        if (bet.outcome != 0) revert ActionAlreadyExecuted();
         if (bet.deadline > block.timestamp) revert BetNotExpired();
-        if (LENS_HUB.ownerOf(profileId) != msg.sender) revert InvalidCaller();
+        if (LENS_HUB.ownerOf(bet.judgeId) != msg.sender) revert InvalidCaller();
         if (outcome != 1 && outcome != 2) revert InvalidOutcome();
 
         bet.outcome = outcome;
 
         if (outcome == 1) {
             IERC20(bet.currency).transfer(
-                LENS_HUB.ownerOf(bet.creatorId),
+                LENS_HUB.ownerOf(profileId),
                 bet.amount * 2
             );
-        } else if (outcome == 2) {
+        } else {
             IERC20(bet.currency).transfer(
                 LENS_HUB.ownerOf(bet.userId),
                 bet.amount * 2
             );
         }
 
-        emit BetFinalized(pubId, profileId, outcome);
+        emit BetFinalized(pubId, profileId, bet.outcome);
     }
 
-    /// @notice gets all bets for a profile
-    /// @param profileId: profile id of the profile
-    function getBets(
-        uint256 profileId
-    ) public view returns (BetTypes.Bet[] memory _bets) {
-        BetTypes.PubParams[] memory pubParams = betsByProfile[profileId];
-        _bets = new BetTypes.Bet[](pubParams.length);
+    // Getters
 
-        for (uint256 i = 0; i < pubParams.length; i++) {
-            _bets[i] = bets[profileId][pubParams[i].pubId];
-        }
+    function getBet(
+        uint256 pubId,
+        uint256 profileId
+    ) external view returns (BetTypes.Bet memory) {
+        return bets[profileId][pubId];
     }
 }
