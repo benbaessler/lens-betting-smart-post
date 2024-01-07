@@ -1,14 +1,13 @@
 import "../styles/Action.css";
 import { useLogin, useProfile, useProfiles } from "@lens-protocol/react-web";
 import { Actions } from "./Act";
-import { Events } from "./Events";
 import { useLensSmartPost } from "../context/LensSmartPostContext";
 import { Create } from "./Create";
 import { useEffect, useState } from "react";
 import { LoginData } from "../utils/types";
 import { Button } from "@/components/ui/button";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
-import { PenLine, Rows, Activity, LogIn, Unplug } from "lucide-react";
+import { PenLine, Rows, LogIn, Unplug } from "lucide-react";
 import { network } from "@/utils/constants";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -109,14 +108,14 @@ function Profiles({
           <Rows className="mr-2 h-4 w-4" />
           View Smart Posts
         </Button>
-        <Button
+        {/* <Button
           variant={activeSection === "events" ? "default" : "secondary"}
           onClick={() => setActiveSection("events")}
           className="px-10 mx-2"
         >
           <Activity className="mr-2 h-4 w-4" />
           Events
-        </Button>
+        </Button> */}
       </div>
       <Button
         variant="outline"
@@ -139,18 +138,23 @@ function Profiles({
         </p>
       )}
       {showSignInWithLens && (
-        <Button
-          variant="outline"
-          className="my-4"
-          onClick={() => executeLogin({ address, profileId: profiles[0].id })}
-        >
-          <LogIn className="mr-2 h-4 w-4" />
-          Sign in with {profiles[0].handle?.localName}.lens
-        </Button>
+        <>
+          {profiles?.map((profile) => 
+            <Button
+              variant="outline"
+              className="my-4"
+              onClick={() => executeLogin({ address, profileId: profile.id })}
+            >
+              <LogIn className="mr-2 h-4 w-4" />
+              Sign in with {profile.handle?.fullHandle}
+            </Button>
+          )}
+        </>
+        
       )}
       {activeSection === "create" && <Create />}
       {activeSection === "actions" && <Actions />}
-      {activeSection === "events" && <Events />}
+      {/* {activeSection === "events" && <Events />} */}
     </div>
   );
 }
